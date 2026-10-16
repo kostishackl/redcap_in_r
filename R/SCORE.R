@@ -5,7 +5,7 @@ bsrc.score<-function(df=NULL,formname=NULL,...){
                     "bis","ctq","isel","iip","ta","neo","paibor","spsi","ssd","uppsp","fs", "let", 
                     "swls","maas","ah","bsia","cfcs", "ders", "iri", "nfc", "rand12", "bpni" ,"bhs",
                     "ipipds", "bipa","dws","es","ffni","icg","ius","narq","pid5","mfq","rrs","sm", 
-                    "doi","scs", "sas","uclals", "pg13r")
+                    "doi","scs", "sas","uclals", "pg13r", "ecog_participant", "ecog_informant")
   if(is.null(formname)){
     message("No form name supplied, choose one of these options:")
     print(possible_forms)
@@ -15,7 +15,9 @@ bsrc.score<-function(df=NULL,formname=NULL,...){
   }else if(tolower(formname)=="athf"){
     stop("ATHF is already scored (see athf_maxnum)")
   }else if(tolower(formname)=="mmse"){
-    stop("MMSE is already scored (see mmse_s_adj)")}
+    stop("MMSE is already scored (see mmse_s_adj)")
+  }else if(tolower(formname)=="ecog"){
+    stop("There is a Participant ECOG and an Informant ECOG. Please use either ecog_participant or ecog_informant.")}
   argu <- list(...)
   argu$df = df
   score_func<-get(paste0("score.",tolower(formname)),envir = loadNamespace("bsrc"))
@@ -227,6 +229,46 @@ score.exit<-function(df=NULL){
                           rowSums(is.na(df[paste0("exit_",c(1:25))]))==2,
                           round(rowSums(df[paste0("exit_",c(1:25))],na.rm=T)*25/23),NA)))
   )
+  return(df)
+}
+
+#ECOG (participant) Scoring
+score.ecog_participant<-function(df=NULL){
+  df<-df %>% 
+    select(masterdemoid, redcap_event_name, ecog_date, ecog1, ecog2, ecog3, ecog4, ecog5, ecog6, ecog7, ecog8, ecog9, ecog10, ecog11, ecog12) %>% 
+    mutate_at(vars(paste0("ecog_",c(1:12))),as.numeric)
+  df[df == 999] <- NA
+  df[df == 998] <- NA
+  df[df == 997] <- NA
+  df[df == 996] <- NA
+  df[df == 995] <- NA
+  df[df == 888] <- NA
+  df<-df %>% 
+    filter(rowSums(is.na(select(., 4:15))) < 12) %>% # filter out rows where no questions are answered
+    rowwise() %>%  # Ensures row-wise operation
+    mutate(ecog_participant_score = round(mean(c_across(4:15), na.rm = TRUE), digit = 1)) %>% # score is average of all completed questions
+    ungroup() %>% 
+    select(masterdemoid, ecog_date, ecog_participant_score)
+  return(df)
+}
+
+#ECOG (informant) Scoring
+score.ecog_informant<-function(df=NULL){
+  df<-df %>% 
+    select(masterdemoid, redcap_event_name, ecog_date, ecog1_inf, ecog2_inf, ecog3_inf, ecog4_inf, ecog5_inf, ecog6_inf, ecog7_inf, ecog8_inf, ecog9_inf, ecog10_inf, ecog11_inf, ecog12_inf) %>% 
+    mutate_at(vars(paste0("ecog_",c(1:12),"_inf")),as.numeric)
+  df[df == 999] <- NA
+  df[df == 998] <- NA
+  df[df == 997] <- NA
+  df[df == 996] <- NA
+  df[df == 995] <- NA
+  df[df == 888] <- NA
+  df<-df %>% 
+    filter(rowSums(is.na(select(., 4:15))) < 12) %>% # filter out rows where no questions are answered
+    rowwise() %>%  # Ensures row-wise operation
+    mutate(ecog_informant_score = round(mean(c_across(4:15), na.rm = TRUE), digit = 1)) %>% # score is average of all completed questions
+    ungroup() %>% 
+    select(masterdemoid, ecog_date, ecog_informant_score)
   return(df)
 }
 
